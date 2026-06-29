@@ -112,17 +112,25 @@ export default function DexMode({ onClose }: Props) {
       <div className="dm-scroll">
         {/* ── 進捗サマリ ── */}
         <div className="dex-summary">
-          <div className="dex-progress-num">
-            <b>{count}</b>
-            <span> / {DEX_TOTAL} 色</span>
+          <div
+            className="dex-ring"
+            style={{
+              background: `conic-gradient(var(--cham) ${pct * 3.6}deg, rgba(237, 231, 217, 0.1) 0)`,
+            }}
+            aria-hidden
+          >
+            <div className="dex-ring-inner">
+              <b>{count}</b>
+              <span>/ {DEX_TOTAL}</span>
+            </div>
           </div>
-          <div className="dex-bar" aria-hidden>
-            <div className="dex-bar-fill" style={{ width: `${pct}%` }} />
+          <div className="dex-summary-meta">
+            <span className="dex-summary-pct">{pct}% 発見</span>
+            <span className="dex-summary-sub">
+              写真 {withPhoto}枚 ・ 残り {DEX_TOTAL - count}色
+            </span>
+            <span className="dex-rule">カメラで採った色だけが図鑑に記録されます</span>
           </div>
-          <span className="dex-progress-pct">
-            伝統色を {pct}% 発見 ・ 📸 {withPhoto}枚
-          </span>
-          <span className="dex-rule">📷 カメラで採った色だけが記録されます</span>
         </div>
 
         {/* ── バッジ ── */}
@@ -163,16 +171,12 @@ export default function DexMode({ onClose }: Props) {
                   if (!entry) {
                     return (
                       <div key={c.romaji} className="dex-cell is-locked" role="listitem" aria-label="未発見">
-                        <span className="dex-chip" aria-hidden>
-                          ？
-                        </span>
-                        <span className="dex-name">？？？</span>
+                        <span className="dex-chip" aria-hidden />
+                        <span className="dex-name" />
                       </div>
                     );
                   }
                   const photo = photos[c.romaji] ?? null;
-                  const ring = entry.hex || c.hex;
-                  const rgb = hexToRgb(c.hex)!;
                   return (
                     <button
                       key={c.romaji}
@@ -182,14 +186,14 @@ export default function DexMode({ onClose }: Props) {
                       aria-label={`${c.ja} の発見を見る`}
                       onClick={() => setDetail({ color: c, entry, photo })}
                     >
-                      <span className="dex-chip" style={{ borderColor: ring }} aria-hidden>
+                      <span className="dex-chip" style={{ borderColor: c.hex }} aria-hidden>
                         {photo ? (
-                          <img className="dex-photo" src={photo} alt="" />
+                          <>
+                            <img className="dex-photo" src={photo} alt="" />
+                            <span className="dex-chip-dot" style={{ background: c.hex }} />
+                          </>
                         ) : (
-                          <span
-                            className="dex-flat"
-                            style={{ background: c.hex, color: isLight(rgb) ? "var(--ink)" : "var(--paper)" }}
-                          />
+                          <span className="dex-flat" style={{ background: c.hex }} />
                         )}
                       </span>
                       <span className="dex-name">{c.ja}</span>

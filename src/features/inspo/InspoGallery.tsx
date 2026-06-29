@@ -206,7 +206,7 @@ function InspoDetail({
           onClick={saveImage}
           disabled={saving}
         >
-          🖼 配色カードを画像で書き出す
+          配色カードを画像で書き出す
         </button>
 
         <div className="inspo-actions">
