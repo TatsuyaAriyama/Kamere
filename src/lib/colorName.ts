@@ -345,14 +345,15 @@ export function systematicName(rgb: RGB): string {
   if (C < 0.05 && L < 0.3) return "黒";
 
   // 無彩色（彩度がごく低い）— 明度で白〜灰へ。
-  if (C < 0.045) {
-    if (L >= 0.93) return "白";
-    if (L >= 0.72) return "明るい灰色";
+  // カメラの白は完全な #FFF にならず少し沈む/色みが乗るため、白判定は緩めにする。
+  if (C < 0.05) {
+    if (L >= 0.85) return "白";
+    if (L >= 0.7) return "明るい灰色";
     if (L >= 0.45) return "灰色";
     return "暗い灰色";
   }
-  // ほぼ白（明るく彩度がわずか）。
-  if (L >= 0.9 && C < 0.06) return "白";
+  // わずかに色みのある明るい色も、十分明るく低彩度なら白とみなす。
+  if (L >= 0.88 && C < 0.075) return "白";
 
   const name = hueName(h);
 

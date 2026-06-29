@@ -20,18 +20,20 @@ export const BRAND_MARBLE: MarblePalette = {
 };
 
 /**
- * 捕まえた色を基準に、渦パターンを保ったまま全バンドを同系色の濃淡へ染める（ティントマーブル）。
- * 色相は概ね保持し、明度を振って深み/ハイライトを作る。
+ * 捕まえた色をそのまま主役にしたティントマーブル。
+ * mid は採取色そのもの。他バンドは明度だけを振って渦の陰影を作る。
+ * 彩度は一切足さない（黒/白/灰を忠実に — 無彩色が別の色に化けないように）。
  */
 export function marbleFromColor(rgb: RGB): MarblePalette {
   const { h, s, l } = rgbToHsl(rgb);
-  const sat = Math.max(0.28, Math.min(0.92, s)); // 極端な無彩・過飽和を緩和
+  const sat = Math.min(1, s);
+  const cl = (x: number) => Math.max(0, Math.min(1, x));
   return {
-    deep: hslToHex({ h, s: Math.min(1, sat + 0.08), l: Math.max(0.16, l * 0.5) }),
-    mid: hslToHex({ h, s: sat, l: Math.max(0.26, Math.min(0.6, l)) }),
-    accent: hslToHex({ h: h + 16, s: sat, l: Math.max(0.3, Math.min(0.62, l * 0.95)) }),
-    light: hslToHex({ h, s: Math.max(0.2, sat - 0.12), l: Math.min(0.82, l + 0.3) }),
-    wisp: hslToHex({ h, s: 0.16, l: 0.92 }),
+    mid: hslToHex({ h, s: sat, l: cl(l) }), // ＝採取色そのもの
+    deep: hslToHex({ h, s: sat, l: cl(l - 0.16) }),
+    accent: hslToHex({ h: sat > 0.12 ? h + 12 : h, s: sat, l: cl(l - 0.05) }),
+    light: hslToHex({ h, s: sat * 0.85, l: cl(l + 0.2) }),
+    wisp: hslToHex({ h, s: sat * 0.4, l: cl(l + 0.34) }),
   };
 }
 
