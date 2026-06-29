@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - claude/kamere-home-video-playback-blptgt
+      - main
   workflow_dispatch:
 
 # GitHub Pages へのデプロイに必要な権限
