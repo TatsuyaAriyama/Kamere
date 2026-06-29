@@ -314,13 +314,17 @@ function hueName(h: number): string {
 export function systematicName(rgb: RGB): string {
   const { h, s, v } = rgbToHsv(rgb);
 
-  // 無彩（彩度ごく低）— 明度で白〜黒へ。
+  // 明度が非常に低い色は、わずかな色みが乗っていても「黒」と判定する。
+  // 暗所では色相を知覚できず人の目にも黒に見える。カメラの黒も完全な0にはならないため、
+  // 「彩度が低い時だけ黒」にすると現実の黒採取を取りこぼす（→ ここで先に拾う）。
+  if (v < 0.22) return "黒";
+
+  // 無彩（彩度ごく低）— 明度で白〜灰へ。
   if (s < 0.08) {
     if (v >= 0.92) return "白";
     if (v >= 0.72) return "明るい灰色";
     if (v >= 0.45) return "灰色";
-    if (v >= 0.22) return "暗い灰色";
-    return "黒";
+    return "暗い灰色";
   }
 
   const hue = hueName(h);
