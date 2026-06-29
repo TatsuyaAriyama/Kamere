@@ -112,15 +112,16 @@ export default function Stage({ source, onCameraError }: Props) {
     setAim(null);
     if (!pending) return;
     const { near } = addColor(pending.rgb);
-    const found = discover(pending.rgb);
+    // 図鑑はカメラで実際に探して採った色だけが記録される（攻略性を高める）。
+    const found = source === "camera" ? discover(pending.rgb) : null;
     setBodyColor(pending.hex);
     void grabHaptic();
     // 採った瞬間に色名を提示。重複なら無言で溜めず知らせる。
     const name = systematicName(pending.rgb);
     if (near) showToast(`${name}（同じ色は採取済み）`);
-    else if (found.isNew) showToast(`${name} を採取 ・ 図鑑に「${found.color.ja}」を発見！`);
+    else if (found?.isNew) showToast(`${name} を採取 ・ 図鑑に「${found.color.ja}」を発見！`);
     else showToast(`${name} を採取`);
-  }, [addColor, discover, setBodyColor, setPhase, setAim, showToast]);
+  }, [source, addColor, discover, setBodyColor, setPhase, setAim, showToast]);
 
   // ── 画像全体から配色を一括抽出 ──────────────────────
   const onExtract = useCallback(() => {
@@ -134,13 +135,15 @@ export default function Stage({ source, onCameraError }: Props) {
       showToast("色を抽出できませんでした");
       return;
     }
+    // 図鑑はカメラ採取のみ反映（写真からの一括抽出は対象外）。
+    const toDex = source === "camera";
     let added = 0;
     let found = 0;
     let lastHex: string | null = null;
     for (const rgb of palette) {
       const { near, swatch } = addColor(rgb);
       if (!near) added += 1;
-      if (discover(rgb).isNew) found += 1;
+      if (toDex && discover(rgb).isNew) found += 1;
       lastHex = swatch.hex;
     }
     if (lastHex) setBodyColor(lastHex);
@@ -150,7 +153,7 @@ export default function Stage({ source, onCameraError }: Props) {
     } else {
       showToast("すべて採取済みの配色でした");
     }
-  }, [activeHandle, addColor, discover, setBodyColor, showToast]);
+  }, [source, activeHandle, addColor, discover, setBodyColor, showToast]);
 
   // ドラッグ離し（カメレオン本体）— 採色はしない（定位置維持）
   const onPickRelease = useCallback((_local: Point) => {}, []);

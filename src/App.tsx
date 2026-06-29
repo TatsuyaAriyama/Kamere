@@ -9,7 +9,6 @@ import Toast from "./features/ui/Toast";
 import { usePaletteStore } from "./store/usePaletteStore";
 import { useChameleonStore } from "./store/useChameleonStore";
 import { useOnboardingStore } from "./store/useOnboardingStore";
-import { useCollectionStore } from "./store/useCollectionStore";
 import { useToastStore } from "./store/useToastStore";
 import { hexToRgb } from "./lib/color";
 import { parseSharedHexes } from "./lib/paletteShare";
@@ -51,7 +50,7 @@ export default function App() {
       const rgb = hexToRgb(hex);
       if (!rgb) continue;
       const { near } = usePaletteStore.getState().add(rgb);
-      useCollectionStore.getState().discover(rgb);
+      // 図鑑はカメラ採取のみ反映。共有リンクからの取り込みは記録しない。
       if (!near) added += 1;
       lastHex = hex;
     }

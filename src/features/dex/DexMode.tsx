@@ -87,6 +87,7 @@ export default function DexMode({ onClose }: Props) {
             <div className="dex-bar-fill" style={{ width: `${pct}%` }} />
           </div>
           <span className="dex-progress-pct">伝統色を {pct}% 発見</span>
+          <span className="dex-rule">📷 カメラで採った色だけが記録されます</span>
         </div>
 
         {/* ── バッジ ── */}

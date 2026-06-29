@@ -2011,6 +2011,15 @@
   color: var(--mist);
 }
 
+.dex-rule {
+  font-size: 11px;
+  color: var(--mist);
+  background: rgba(237, 231, 217, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
 .dex-badges {
   display: flex;
   flex-wrap: wrap;
