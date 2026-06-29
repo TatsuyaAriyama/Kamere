@@ -1,5 +1,5 @@
 import type { RGB } from "./color";
-import { deltaE2000, hexToRgb, rgbToHsv, rgbToLab, type Lab } from "./color";
+import { deltaE2000, hexToRgb, rgbToLab, rgbToOklch, type Lab } from "./color";
 
 /** 日本の伝統色（和名）。出典: NIPPON COLORS（250色）。 */
 export type NamedColor = { ja: string; romaji: string; hex: string };
@@ -288,64 +288,84 @@ export function closenessLabel(deltaE: number): string {
   return "近い系統";
 }
 
-const HUE_NAMES: { max: number; name: string }[] = [
-  { max: 11, name: "赤" },
-  { max: 40, name: "橙" },
-  { max: 67, name: "黄" },
-  { max: 110, name: "黄緑" },
-  { max: 160, name: "緑" },
-  { max: 200, name: "青緑" },
-  { max: 250, name: "青" },
-  { max: 275, name: "青紫" },
-  { max: 320, name: "紫" },
-  { max: 349, name: "赤紫" },
-  { max: 360, name: "赤" },
+// OKLCH 色相角（実測でキャリブレーション）→ 基本10色相。
+// 知覚的に均一なので、HSVより遥かに正確に「人が呼ぶ色名」へ対応する。
+const HUE_BANDS: { max: number; name: string }[] = [
+  { max: 8, name: "赤紫" }, // 0..8（薔薇〜赤紫）
+  { max: 38, name: "赤" },
+  { max: 70, name: "橙" },
+  { max: 118, name: "黄" },
+  { max: 138, name: "黄緑" },
+  { max: 165, name: "緑" },
+  { max: 212, name: "青緑" },
+  { max: 268, name: "青" },
+  { max: 300, name: "青紫" },
+  { max: 322, name: "紫" },
+  { max: 360, name: "赤紫" }, // 322..360（赤紫〜紅紫）
 ];
 
 function hueName(h: number): string {
-  for (const { max, name } of HUE_NAMES) if (h < max) return name;
-  return "赤";
+  const hh = ((h % 360) + 360) % 360;
+  for (const { max, name } of HUE_BANDS) if (hh < max) return name;
+  return "赤紫";
+}
+
+/** 明度(L)と彩度(C)から、有彩色のトーン修飾語を決める（OKLCH基準）。 */
+function toneWord(L: number, C: number): string {
+  if (C >= 0.15) {
+    // 高彩度
+    if (L >= 0.8) return C >= 0.18 ? "鮮やかな" : "明るい";
+    if (L >= 0.55) return "鮮やかな";
+    if (L >= 0.4) return "濃い";
+    return "暗い";
+  }
+  if (C >= 0.08) {
+    // 中彩度
+    if (L >= 0.78) return "明るい";
+    if (L >= 0.58) return "";
+    if (L >= 0.42) return "くすんだ";
+    return "暗い";
+  }
+  // 低彩度
+  if (L >= 0.78) return "淡い";
+  if (L >= 0.58) return "灰みの";
+  if (L >= 0.42) return "くすんだ";
+  return "暗い";
 }
 
 /**
- * 系統色名（JIS系統色名に倣う色相×トーンの記述）。
- * 採色した「すべての色」を確定的に言語化できる — 近似ではなく定義による全色対応。
+ * 系統色名（OKLCH＝知覚的に均一な空間で判定）。
+ * 黒・白・灰の無彩色、茶（ブラウン）・桃（ピンク）の派生、10色相×トーンで全色を言語化する。
  */
 export function systematicName(rgb: RGB): string {
-  const { h, s, v } = rgbToHsv(rgb);
+  const { L, C, h } = rgbToOklch(rgb);
 
-  // 明度が非常に低い色は、わずかな色みが乗っていても「黒」と判定する。
-  // 暗所では色相を知覚できず人の目にも黒に見える。カメラの黒も完全な0にはならないため、
-  // 「彩度が低い時だけ黒」にすると現実の黒採取を取りこぼす（→ ここで先に拾う）。
-  if (v < 0.22) return "黒";
+  // 黒: 知覚的にごく暗い、または暗くて彩度が低い色は色相に関わらず黒。
+  if (L < 0.13) return "黒";
+  if (C < 0.05 && L < 0.3) return "黒";
 
-  // 無彩（彩度ごく低）— 明度で白〜灰へ。
-  if (s < 0.08) {
-    if (v >= 0.92) return "白";
-    if (v >= 0.72) return "明るい灰色";
-    if (v >= 0.45) return "灰色";
+  // 無彩色（彩度がごく低い）— 明度で白〜灰へ。
+  if (C < 0.045) {
+    if (L >= 0.93) return "白";
+    if (L >= 0.72) return "明るい灰色";
+    if (L >= 0.45) return "灰色";
     return "暗い灰色";
   }
+  // ほぼ白（明るく彩度がわずか）。
+  if (L >= 0.9 && C < 0.06) return "白";
 
-  const hue = hueName(h);
-  let tone: string;
-  if (s >= 0.65) {
-    if (v >= 0.8) tone = "あざやかな";
-    else if (v >= 0.5) tone = "濃い";
-    else tone = "暗い";
-  } else if (s >= 0.35) {
-    if (v >= 0.85) tone = "明るい";
-    else if (v >= 0.55) tone = "";
-    else if (v >= 0.3) tone = "くすんだ";
-    else tone = "暗い";
-  } else if (s >= 0.15) {
-    if (v >= 0.85) tone = "淡い";
-    else if (v >= 0.5) tone = "くすんだ";
-    else tone = "暗い";
-  } else {
-    if (v >= 0.85) tone = "ごく淡い";
-    else if (v >= 0.5) tone = "灰みの";
-    else tone = "暗い灰みの";
+  const name = hueName(h);
+
+  // 茶（ブラウン）＝ 橙/黄の暗め・中彩度。
+  if ((name === "橙" || name === "黄") && L < 0.62 && C < 0.18) {
+    if (L < 0.4) return "焦茶";
+    if (L >= 0.55) return "明るい茶";
+    return "茶";
   }
-  return tone + hue;
+  // 桃（ピンク）＝ 赤/赤紫の明るく淡い領域。
+  if ((name === "赤" || name === "赤紫") && L >= 0.8 && C < 0.13) {
+    return "桃";
+  }
+
+  return toneWord(L, C) + name;
 }
