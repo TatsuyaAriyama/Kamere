@@ -2399,6 +2399,28 @@
   color: var(--mist);
 }
 
+.inspo-card-export {
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 13px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.inspo-card-export:active {
+  transform: scale(0.99);
+}
+.inspo-card-export:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .inspo-actions {
   display: flex;
   gap: 8px;

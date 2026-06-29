@@ -4,6 +4,7 @@ import { usePaletteStore, type Swatch } from "../../store/usePaletteStore";
 import { useToastStore } from "../../store/useToastStore";
 import { getAllInspoPhotos, removeInspoPhoto } from "../../lib/inspoPhotos";
 import { nearestColorName, systematicName } from "../../lib/colorName";
+import { exportInspoCardImage } from "../../lib/cardImage";
 import ExportSheet from "../palette/ExportSheet";
 
 type Props = {
@@ -119,6 +120,17 @@ function InspoDetail({
   const showToast = useToastStore((s) => s.show);
   const [note, setLocalNote] = useState(card.note ?? "");
   const [exporting, setExporting] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const saveImage = async () => {
+    if (saving) return;
+    setSaving(true);
+    showToast("カード画像を作成中…");
+    const r = await exportInspoCardImage(card, photo);
+    setSaving(false);
+    if (r === "downloaded") showToast("カード画像を保存しました");
+    else if (r === "failed") showToast("画像を作成できませんでした");
+  };
 
   const adopt = () => {
     let n = 0;
@@ -188,12 +200,21 @@ function InspoDetail({
           onBlur={saveNote}
         />
 
+        <button
+          type="button"
+          className="inspo-card-export"
+          onClick={saveImage}
+          disabled={saving}
+        >
+          🖼 配色カードを画像で書き出す
+        </button>
+
         <div className="inspo-actions">
           <button type="button" className="inspo-act" onClick={adopt}>
             パレットに採用
           </button>
           <button type="button" className="inspo-act" onClick={() => setExporting(true)}>
-            書き出す
+            コード書き出し
           </button>
           <button type="button" className="inspo-act danger" onClick={del}>
             削除
