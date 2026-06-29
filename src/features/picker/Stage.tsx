@@ -8,6 +8,7 @@ import { useChameleonStore } from "../../store/useChameleonStore";
 import { usePaletteStore } from "../../store/usePaletteStore";
 import { useToastStore } from "../../store/useToastStore";
 import { useCollectionStore } from "../../store/useCollectionStore";
+import { putPhoto } from "../../lib/dexPhotos";
 import { grabHaptic } from "../../lib/haptics";
 import { rgbToHex, type RGB } from "../../lib/color";
 import { systematicName } from "../../lib/colorName";
@@ -15,6 +16,22 @@ import { extractPalette } from "../../lib/extract";
 import type { ColorSourceHandle, SourceErrorKind } from "./source";
 
 const LONG_PRESS = 260; // ms
+const THUMB_SIZE = 320; // 発見アルバムの証拠写真の一辺(px)
+
+/** 採取点まわりの正方クロップを JPEG dataURL 化（発見アルバム用）。失敗時は null。 */
+function makeThumb(handle: ColorSourceHandle, clientX: number, clientY: number): string | null {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = THUMB_SIZE;
+    canvas.height = THUMB_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    if (!handle.drawThumb(ctx, clientX, clientY, THUMB_SIZE)) return null;
+    return canvas.toDataURL("image/jpeg", 0.8);
+  } catch {
+    return null;
+  }
+}
 
 type Props = {
   source: "camera" | "photo";
@@ -77,7 +94,7 @@ export default function Stage({ source, onCameraError }: Props) {
 
   // ── グラブ（舌）ライフサイクル ──────────────────────
   const grabIdRef = useRef(0);
-  const pendingRef = useRef<{ rgb: RGB; hex: string } | null>(null);
+  const pendingRef = useRef<{ rgb: RGB; hex: string; thumb: string | null } | null>(null);
   const [grab, setGrab] = useState<GrabRequest | null>(null);
 
   const triggerGrab = useCallback(
@@ -92,14 +109,16 @@ export default function Stage({ source, onCameraError }: Props) {
         return;
       }
       const hex = rgbToHex(rgb);
-      pendingRef.current = { rgb, hex };
+      // 図鑑（カメラ採取のみ）の証拠写真を、採取した瞬間のフレームから切り出して保持。
+      const thumb = source === "camera" && handle ? makeThumb(handle, client.x, client.y) : null;
+      pendingRef.current = { rgb, hex, thumb };
       const from = useChameleonStore.getState().pos;
       // 標的の方へ向き直り、目線を固定（照準）
       setFacing(toLocalPt.x >= from.x ? 1 : -1);
       setAim(toLocalPt);
       setGrab({ id: ++grabIdRef.current, from, to: toLocalPt, color: hex });
     },
-    [activeHandle, localToClient, showToast, setFacing, setAim],
+    [source, activeHandle, localToClient, showToast, setFacing, setAim],
   );
 
   const onTongueStart = useCallback(() => setPhase("grabbing"), [setPhase]);
@@ -114,6 +133,8 @@ export default function Stage({ source, onCameraError }: Props) {
     const { near } = addColor(pending.rgb);
     // 図鑑はカメラで実際に探して採った色だけが記録される（攻略性を高める）。
     const found = source === "camera" ? discover(pending.rgb) : null;
+    // 初発見なら、採取した瞬間の証拠写真を発見アルバムへ保存。
+    if (found?.isNew && pending.thumb) void putPhoto(found.color.romaji, pending.thumb);
     setBodyColor(pending.hex);
     void grabHaptic();
     // 採った瞬間に色名を提示。重複なら無言で溜めず知らせる。

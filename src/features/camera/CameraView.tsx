@@ -76,6 +76,25 @@ const CameraView = forwardRef<ColorSourceHandle, Props>(function CameraView(
         if (!v || !v.videoWidth) return null;
         return drawSnapshot(v, v.videoWidth, v.videoHeight, maxDim);
       },
+      drawThumb(ctx, clientX, clientY, destSize) {
+        const v = videoRef.current;
+        if (!v || !v.videoWidth) return false;
+        const rect = v.getBoundingClientRect();
+        const p = clientToMediaPixel(rect, v.videoWidth, v.videoHeight, "cover", clientX, clientY);
+        if (!p) return false;
+        // 採取点まわりの正方クロップ（フレーム短辺の約40%）を文脈ごと滑らかに描画。
+        const crop = Math.min(v.videoWidth, v.videoHeight) * 0.4;
+        const sx = Math.max(0, Math.min(v.videoWidth - crop, p.mx - crop / 2));
+        const sy = Math.max(0, Math.min(v.videoHeight - crop, p.my - crop / 2));
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        try {
+          ctx.drawImage(v, sx, sy, crop, crop, 0, 0, destSize, destSize);
+        } catch {
+          return false;
+        }
+        return true;
+      },
     }),
     [],
   );

@@ -19,6 +19,16 @@ export interface ColorSourceHandle {
   ): boolean;
   /** 現在のフレーム/画像を最大 maxDim に縮小して ImageData を返す（配色抽出用）。無効なら null。 */
   snapshot(maxDim: number): ImageData | null;
+  /**
+   * client点を中心に、文脈が分かる正方クロップを ctx(destSize×destSize)へ
+   * 滑らかに描画（発見アルバムの証拠写真用）。範囲内なら true。
+   */
+  drawThumb(
+    ctx: CanvasRenderingContext2D,
+    clientX: number,
+    clientY: number,
+    destSize: number,
+  ): boolean;
 }
 
 export type SourceErrorKind = "permission" | "notfound" | "unknown";

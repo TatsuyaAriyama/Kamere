@@ -69,6 +69,24 @@ const PhotoView = forwardRef<ColorSourceHandle, Props>(function PhotoView({ acti
         if (!img || !img.naturalWidth) return null;
         return drawSnapshot(img, img.naturalWidth, img.naturalHeight, maxDim);
       },
+      drawThumb(ctx, clientX, clientY, destSize) {
+        const img = imgRef.current;
+        if (!img || !img.naturalWidth) return false;
+        const rect = img.getBoundingClientRect();
+        const p = clientToMediaPixel(rect, img.naturalWidth, img.naturalHeight, "contain", clientX, clientY);
+        if (!p) return false;
+        const crop = Math.min(img.naturalWidth, img.naturalHeight) * 0.4;
+        const sx = Math.max(0, Math.min(img.naturalWidth - crop, p.mx - crop / 2));
+        const sy = Math.max(0, Math.min(img.naturalHeight - crop, p.my - crop / 2));
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        try {
+          ctx.drawImage(img, sx, sy, crop, crop, 0, 0, destSize, destSize);
+        } catch {
+          return false;
+        }
+        return true;
+      },
     }),
     [],
   );

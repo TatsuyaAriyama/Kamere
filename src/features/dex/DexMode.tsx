@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from "react";
-import { useCollectionStore, DEX_TOTAL } from "../../store/useCollectionStore";
+import { useEffect, useMemo, useState } from "react";
+import { useCollectionStore, DEX_TOTAL, type DexEntry } from "../../store/useCollectionStore";
 import { useToastStore } from "../../store/useToastStore";
-import { TRADITIONAL_COLORS, type NamedColor } from "../../lib/colorName";
-import { hexToRgb, isLight, rgbToHsv } from "../../lib/color";
+import { TRADITIONAL_COLORS, closenessLabel, type NamedColor } from "../../lib/colorName";
+import { hexToRgb, isLight } from "../../lib/color";
+import { getAllPhotos, clearPhotos } from "../../lib/dexPhotos";
 
 type Props = {
   onClose: () => void;
@@ -23,15 +24,27 @@ type CatKey = (typeof CATEGORIES)[number]["key"];
 function categoryOf(hex: string): CatKey {
   const rgb = hexToRgb(hex);
   if (!rgb) return "neutral";
-  const { h, s } = rgbToHsv(rgb);
+  const max = Math.max(rgb.r, rgb.g, rgb.b);
+  const min = Math.min(rgb.r, rgb.g, rgb.b);
+  const s = max === 0 ? 0 : (max - min) / max;
   if (s < 0.12) return "neutral";
+  // 色相を算出
+  const rn = rgb.r / 255, gn = rgb.g / 255, bn = rgb.b / 255;
+  const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn), d = mx - mn;
+  let h = 0;
+  if (d !== 0) {
+    if (mx === rn) h = ((gn - bn) / d) % 6;
+    else if (mx === gn) h = (bn - rn) / d + 2;
+    else h = (rn - gn) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
   if (h < 20 || h >= 320) return "redpink"; // 桃〜紅
   if (h < 50) return "orange";
   if (h < 70) return "yellow";
   if (h < 160) return "green";
   if (h < 250) return "blue";
   return "purple"; // 250〜320
-
 }
 
 // 伝統色を系統ごとに分類（起動時に1度だけ）。
@@ -43,26 +56,46 @@ const GROUPED: { key: CatKey; label: string; colors: NamedColor[] }[] = CATEGORI
 
 const MILESTONES = [10, 50, 100, DEX_TOTAL];
 
-/** 図鑑。採った色から見つけた伝統色を集めるコレクション画面。 */
+type Detail = { color: NamedColor; entry: DexEntry; photo: string | null };
+
+/** 図鑑＝発見アルバム。採った色から見つけた伝統色を、採取時の証拠写真とともに集める。 */
 export default function DexMode({ onClose }: Props) {
   const discovered = useCollectionStore((s) => s.discovered);
   const reset = useCollectionStore((s) => s.reset);
   const showToast = useToastStore((s) => s.show);
+  const [photos, setPhotos] = useState<Record<string, string>>({});
+  const [detail, setDetail] = useState<Detail | null>(null);
 
   const count = useMemo(() => Object.keys(discovered).length, [discovered]);
+  const withPhoto = useMemo(
+    () => Object.keys(discovered).filter((k) => photos[k]).length,
+    [discovered, photos],
+  );
   const pct = Math.round((count / DEX_TOTAL) * 100);
 
   useEffect(() => {
+    let alive = true;
+    getAllPhotos().then((p) => alive && setPhotos(p));
+    return () => {
+      alive = false;
+    };
+  }, [discovered]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      if (detail) setDetail(null);
+      else onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, detail]);
 
   const onReset = () => {
-    if (window.confirm("図鑑の発見記録をすべて消します。よろしいですか？")) {
+    if (window.confirm("図鑑の発見記録と写真をすべて消します。よろしいですか？")) {
       reset();
+      void clearPhotos();
+      setPhotos({});
       showToast("図鑑をリセットしました");
     }
   };
@@ -86,7 +119,9 @@ export default function DexMode({ onClose }: Props) {
           <div className="dex-bar" aria-hidden>
             <div className="dex-bar-fill" style={{ width: `${pct}%` }} />
           </div>
-          <span className="dex-progress-pct">伝統色を {pct}% 発見</span>
+          <span className="dex-progress-pct">
+            伝統色を {pct}% 発見 ・ 📸 {withPhoto}枚
+          </span>
           <span className="dex-rule">📷 カメラで採った色だけが記録されます</span>
         </div>
 
@@ -124,9 +159,8 @@ export default function DexMode({ onClose }: Props) {
               </h3>
               <div className="dex-grid" role="list">
                 {g.colors.map((c) => {
-                  const rgb = hexToRgb(c.hex)!;
-                  const isFound = c.romaji in discovered;
-                  if (!isFound) {
+                  const entry = discovered[c.romaji];
+                  if (!entry) {
                     return (
                       <div key={c.romaji} className="dex-cell is-locked" role="listitem" aria-label="未発見">
                         <span className="dex-chip" aria-hidden>
@@ -136,20 +170,28 @@ export default function DexMode({ onClose }: Props) {
                       </div>
                     );
                   }
+                  const photo = photos[c.romaji] ?? null;
+                  const ring = entry.hex || c.hex;
+                  const rgb = hexToRgb(c.hex)!;
                   return (
                     <button
                       key={c.romaji}
                       type="button"
                       className="dex-cell"
                       role="listitem"
-                      aria-label={`${c.ja} ${c.hex}`}
-                      onClick={() => showToast(`${c.ja}　${c.hex}`)}
+                      aria-label={`${c.ja} の発見を見る`}
+                      onClick={() => setDetail({ color: c, entry, photo })}
                     >
-                      <span
-                        className="dex-chip"
-                        style={{ background: c.hex, color: isLight(rgb) ? "var(--ink)" : "var(--paper)" }}
-                        aria-hidden
-                      />
+                      <span className="dex-chip" style={{ borderColor: ring }} aria-hidden>
+                        {photo ? (
+                          <img className="dex-photo" src={photo} alt="" />
+                        ) : (
+                          <span
+                            className="dex-flat"
+                            style={{ background: c.hex, color: isLight(rgb) ? "var(--ink)" : "var(--paper)" }}
+                          />
+                        )}
+                      </span>
                       <span className="dex-name">{c.ja}</span>
                     </button>
                   );
@@ -162,6 +204,74 @@ export default function DexMode({ onClose }: Props) {
         <button type="button" className="dex-reset" onClick={onReset}>
           図鑑をリセット
         </button>
+      </div>
+
+      {detail && <DexDetail detail={detail} onClose={() => setDetail(null)} />}
+    </div>
+  );
+}
+
+function DexDetail({ detail, onClose }: { detail: Detail; onClose: () => void }) {
+  const { color, entry, photo } = detail;
+  const yourRgb = hexToRgb(entry.hex);
+  const tradRgb = hexToRgb(color.hex)!;
+  const dateStr = entry.at ? new Date(entry.at).toLocaleDateString("ja-JP") : null;
+  const hasDelta = Number.isFinite(entry.deltaE);
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="color-sheet dex-detail"
+        role="dialog"
+        aria-label={`${color.ja} の発見`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sheet-grip" aria-hidden />
+
+        <div className="dex-detail-photo-wrap">
+          {photo ? (
+            <img className="dex-detail-photo" src={photo} alt={`${color.ja} を採取した場所`} />
+          ) : (
+            <div className="dex-detail-photo dex-detail-noimg" style={{ background: color.hex }} aria-hidden>
+              <span style={{ color: isLight(tradRgb) ? "var(--ink)" : "var(--paper)" }}>写真なし</span>
+            </div>
+          )}
+        </div>
+
+        <div className="dex-detail-head">
+          <span className="dex-detail-ja">{color.ja}</span>
+          <span className="dex-detail-romaji">{color.romaji}</span>
+        </div>
+
+        <div className="dex-detail-rows">
+          <div className="dex-detail-row">
+            <span className="dex-detail-sw" style={{ background: color.hex }} aria-hidden />
+            <span className="dex-detail-label">伝統色</span>
+            <span className="dex-detail-val">{color.hex}</span>
+          </div>
+          {yourRgb && (
+            <div className="dex-detail-row">
+              <span className="dex-detail-sw" style={{ background: entry.hex }} aria-hidden />
+              <span className="dex-detail-label">採った色</span>
+              <span className="dex-detail-val">{entry.hex}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="dex-detail-meta">
+          {hasDelta && (
+            <span className="dex-detail-chip">
+              {closenessLabel(entry.deltaE)}（ΔE {entry.deltaE.toFixed(1)}）
+            </span>
+          )}
+          {dateStr && <span className="dex-detail-chip">発見日 {dateStr}</span>}
+        </div>
+
+        <div className="sheet-actions">
+          <button type="button" className="sheet-close" onClick={onClose}>
+            閉じる
+          </button>
+        </div>
       </div>
     </div>
   );
