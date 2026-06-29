@@ -29,6 +29,11 @@ export interface ColorSourceHandle {
     clientY: number,
     destSize: number,
   ): boolean;
+  /**
+   * 現在のフレーム全体を、表示用の写真(JPEG dataURL)と配色抽出用の小画像として取得。
+   * インスピ・キャプチャ用。無効なら null。
+   */
+  capturePhoto(maxDim: number): { dataUrl: string; image: ImageData } | null;
 }
 
 export type SourceErrorKind = "permission" | "notfound" | "unknown";

@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import type { ColorSourceHandle } from "../picker/source";
 import {
+  captureFrame,
   clientToMediaPixel,
   drawSnapshot,
   getDisplayedRect,
@@ -86,6 +87,11 @@ const PhotoView = forwardRef<ColorSourceHandle, Props>(function PhotoView({ acti
           return false;
         }
         return true;
+      },
+      capturePhoto(maxDim) {
+        const img = imgRef.current;
+        if (!img || !img.naturalWidth) return null;
+        return captureFrame(img, img.naturalWidth, img.naturalHeight, maxDim);
       },
     }),
     [],

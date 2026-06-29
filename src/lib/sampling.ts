@@ -187,6 +187,49 @@ export function drawSnapshot(
 }
 
 /**
+ * 1フレームから「表示用の写真(JPEG dataURL)」と「配色抽出用の小さな ImageData」を
+ * 同時に生成する（インスピ・キャプチャ用）。同一フレームなので写真と配色が一致する。
+ */
+export function captureFrame(
+  source: Drawable,
+  naturalW: number,
+  naturalH: number,
+  maxDim: number,
+  smallDim = 110,
+  quality = 0.82,
+): { dataUrl: string; image: ImageData } | null {
+  if (naturalW <= 0 || naturalH <= 0) return null;
+  const scale = Math.min(1, maxDim / Math.max(naturalW, naturalH));
+  const w = Math.max(1, Math.round(naturalW * scale));
+  const h = Math.max(1, Math.round(naturalH * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  try {
+    ctx.drawImage(source, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL("image/jpeg", quality);
+    // 抽出は小さい画像で十分（メディアンカットの負荷を抑える）。
+    const s = Math.min(1, smallDim / Math.max(w, h));
+    const sw = Math.max(1, Math.round(w * s));
+    const sh = Math.max(1, Math.round(h * s));
+    const sc = document.createElement("canvas");
+    sc.width = sw;
+    sc.height = sh;
+    const sctx = sc.getContext("2d", { willReadFrequently: true });
+    if (!sctx) return null;
+    sctx.drawImage(canvas, 0, 0, sw, sh);
+    const image = sctx.getImageData(0, 0, sw, sh);
+    return { dataUrl, image };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * viewport座標で指定した点の色をソースからサンプリング。範囲外は null。
  */
 export function sampleAtClient(

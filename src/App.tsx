@@ -4,6 +4,7 @@ import PaletteTray from "./features/palette/PaletteTray";
 import DesignMode from "./features/design/DesignMode";
 import DrawMode from "./features/draw/DrawMode";
 import DexMode from "./features/dex/DexMode";
+import InspoGallery from "./features/inspo/InspoGallery";
 import Onboarding from "./features/onboarding/Onboarding";
 import Toast from "./features/ui/Toast";
 import { usePaletteStore } from "./store/usePaletteStore";
@@ -24,6 +25,7 @@ export default function App() {
   const [designOpen, setDesignOpen] = useState(false);
   const [drawOpen, setDrawOpen] = useState(false);
   const [dexOpen, setDexOpen] = useState(false);
+  const [inspoOpen, setInspoOpen] = useState(false);
 
   const clearPalette = usePaletteStore((s) => s.clear);
   const resetBody = useChameleonStore((s) => s.setBodyColor);
@@ -134,6 +136,14 @@ export default function App() {
           <button
             type="button"
             className="design-enter"
+            aria-label="インスピを開く"
+            onClick={() => setInspoOpen(true)}
+          >
+            インスピ
+          </button>
+          <button
+            type="button"
+            className="design-enter"
             aria-label="図鑑を開く"
             onClick={() => setDexOpen(true)}
           >
@@ -167,6 +177,7 @@ export default function App() {
       {designOpen && <DesignMode onClose={() => setDesignOpen(false)} />}
       {drawOpen && <DrawMode onClose={() => setDrawOpen(false)} />}
       {dexOpen && <DexMode onClose={() => setDexOpen(false)} />}
+      {inspoOpen && <InspoGallery onClose={() => setInspoOpen(false)} />}
 
       {!seenOnboarding && <Onboarding onClose={completeOnboarding} />}
     </div>

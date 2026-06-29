@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { ColorSourceHandle, SourceErrorKind } from "../picker/source";
 import {
+  captureFrame,
   clientToMediaPixel,
   drawSnapshot,
   getDisplayedRect,
@@ -94,6 +95,11 @@ const CameraView = forwardRef<ColorSourceHandle, Props>(function CameraView(
           return false;
         }
         return true;
+      },
+      capturePhoto(maxDim) {
+        const v = videoRef.current;
+        if (!v || !v.videoWidth) return null;
+        return captureFrame(v, v.videoWidth, v.videoHeight, maxDim);
       },
     }),
     [],

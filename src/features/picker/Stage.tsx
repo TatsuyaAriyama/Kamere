@@ -8,7 +8,9 @@ import { useChameleonStore } from "../../store/useChameleonStore";
 import { usePaletteStore } from "../../store/usePaletteStore";
 import { useToastStore } from "../../store/useToastStore";
 import { useCollectionStore } from "../../store/useCollectionStore";
+import { useInspoStore } from "../../store/useInspoStore";
 import { putPhoto } from "../../lib/dexPhotos";
+import { putInspoPhoto } from "../../lib/inspoPhotos";
 import { grabHaptic } from "../../lib/haptics";
 import { rgbToHex, type RGB } from "../../lib/color";
 import { systematicName } from "../../lib/colorName";
@@ -176,6 +178,31 @@ export default function Stage({ source, onCameraError }: Props) {
     }
   }, [source, activeHandle, addColor, discover, setBodyColor, showToast]);
 
+  // ── インスピ・キャプチャ（写真＋配色を1枚のカードに保存）──
+  const onCapture = useCallback(() => {
+    const cap = activeHandle()?.capturePhoto(1080) ?? null;
+    if (!cap) {
+      showToast("ここでは撮れません");
+      return;
+    }
+    const palette = extractPalette(cap.image, 6);
+    if (palette.length === 0) {
+      showToast("配色を抽出できませんでした");
+      return;
+    }
+    const id = crypto.randomUUID();
+    const card = {
+      id,
+      at: Date.now(),
+      palette: palette.map((rgb) => ({ hex: rgbToHex(rgb), rgb })),
+    };
+    void putInspoPhoto(id, cap.dataUrl);
+    useInspoStore.getState().add(card);
+    setBodyColor(card.palette[0].hex);
+    void grabHaptic();
+    showToast(`インスピを保存（${palette.length}色）`);
+  }, [activeHandle, setBodyColor, showToast]);
+
   // ドラッグ離し（カメレオン本体）— 採色はしない（定位置維持）
   const onPickRelease = useCallback((_local: Point) => {}, []);
 
@@ -294,6 +321,15 @@ export default function Stage({ source, onCameraError }: Props) {
         onClick={onExtract}
       >
         配色を抽出
+      </button>
+
+      <button
+        type="button"
+        className="shutter-btn"
+        aria-label="インスピを撮る（写真と配色をカードに保存）"
+        onClick={onCapture}
+      >
+        <span className="shutter-ring" aria-hidden />
       </button>
     </main>
   );
