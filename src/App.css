@@ -112,6 +112,8 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  /* ストリーム取得前の <video> に出るネイティブ再生ボタンを背景で隠す */
+  background: #0d0f0d;
 }
 
 .media-contain {

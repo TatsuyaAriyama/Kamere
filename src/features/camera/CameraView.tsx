@@ -123,6 +123,11 @@ const CameraView = forwardRef<ColorSourceHandle, Props>(function CameraView(
     };
   }, [active, facing, onError, onReady]);
 
+  // 非アクティブ時は <video> を描画しない。
+  // ソース未設定の <video> は iOS WKWebView がネイティブの再生ボタン（◯＋▶）を
+  // プレースホルダー表示してしまい、写真モードで動画プレイヤーのように見えるため。
+  if (!active) return null;
+
   return (
     <>
       <video
@@ -132,16 +137,14 @@ const CameraView = forwardRef<ColorSourceHandle, Props>(function CameraView(
         muted
         autoPlay
       />
-      {active && (
-        <button
-          type="button"
-          className="cam-flip"
-          aria-label="カメラの前後を切り替え"
-          onClick={() => setFacing((f) => (f === "environment" ? "user" : "environment"))}
-        >
-          ⟲
-        </button>
-      )}
+      <button
+        type="button"
+        className="cam-flip"
+        aria-label="カメラの前後を切り替え"
+        onClick={() => setFacing((f) => (f === "environment" ? "user" : "environment"))}
+      >
+        ⟲
+      </button>
     </>
   );
 });
