@@ -106,6 +106,21 @@ export default function Stage({ source, onCameraError }: Props) {
     [source],
   );
 
+  // カメラは「撮って固定 → 採る」方式。固定中の静止フレームから採色するとブレが出ない。
+  const [frozen, setFrozen] = useState(false);
+  // 写真モードへ切り替えたら固定状態は解除。
+  useEffect(() => {
+    if (source !== "camera") setFrozen(false);
+  }, [source]);
+  const freeze = useCallback(() => {
+    setFrozen(true);
+    void grabHaptic();
+  }, []);
+  const unfreeze = useCallback(() => setFrozen(false), []);
+  // 採色できる状態か（写真モード or カメラ固定中）。ライブはまず固定が必要。
+  const isStill = source === "photo" || (source === "camera" && frozen);
+  const isLive = source === "camera" && !frozen;
+
   // ── ステージ寸法計測 + カメレオン初期配置 ──────────────
   useLayoutEffect(() => {
     const el = stageRef.current;
@@ -313,9 +328,12 @@ export default function Stage({ source, onCameraError }: Props) {
     if (useChameleonStore.getState().phase === "grabbing") return;
     const client = { x: e.clientX, y: e.clientY };
     stageRef.current?.setPointerCapture?.(e.pointerId);
-    const timer = window.setTimeout(() => {
-      setLoupe({ local: toLocal(client.x, client.y), client, hex: sampleHex(client) });
-    }, LONG_PRESS);
+    // ライブ中はタップでフレームを固定する（採色は固定後）。ルーペ照準は使わない。
+    const timer = isLive
+      ? 0
+      : window.setTimeout(() => {
+          setLoupe({ local: toLocal(client.x, client.y), client, hex: sampleHex(client) });
+        }, LONG_PRESS);
     pressRef.current = {
       timer,
       pointerId: e.pointerId,
@@ -343,6 +361,11 @@ export default function Stage({ source, onCameraError }: Props) {
     window.clearTimeout(p.timer);
     stageRef.current?.releasePointerCapture?.(e.pointerId);
     pressRef.current = null;
+    if (isLive) {
+      // ライブのタップ → フレームを固定（次のタップで採色）。
+      if (!p.moved && performance.now() - p.startedAt < LONG_PRESS) freeze();
+      return;
+    }
     if (loupe) {
       // 長押し照準 → 照準点へ舌を飛ばす
       const local = toLocal(p.client.x, p.client.y);
@@ -371,7 +394,7 @@ export default function Stage({ source, onCameraError }: Props) {
       onPointerUp={endPress}
       onPointerCancel={endPress}
     >
-      <CameraView ref={camRef} active={source === "camera"} onError={onCameraError} />
+      <CameraView ref={camRef} active={source === "camera"} frozen={frozen} onError={onCameraError} />
       <PhotoView ref={photoRef} active={source === "photo"} />
 
       <Chameleon toLocal={toLocal} onPickRelease={onPickRelease} />
@@ -394,32 +417,57 @@ export default function Stage({ source, onCameraError }: Props) {
         source={activeHandle()}
       />
 
-      <button
-        type="button"
-        className="extract-btn"
-        aria-label="画像全体から配色を抽出"
-        onClick={onExtract}
-      >
-        配色を抽出
-      </button>
+      {/* 静止時（写真 or カメラ固定中）のみ採色アクションを出す */}
+      {isStill && (
+        <>
+          <button
+            type="button"
+            className="extract-btn"
+            aria-label="画像全体から配色を抽出"
+            onClick={onExtract}
+          >
+            配色を抽出
+          </button>
+          <button
+            type="button"
+            className="inspo-save-btn"
+            aria-label="この1枚をインスピに保存（写真と配色をカードに）"
+            onClick={onCapture}
+          >
+            インスピに保存
+          </button>
+        </>
+      )}
 
-      <button
-        type="button"
-        className="shutter-btn"
-        aria-label="インスピを撮る（写真と配色をカードに保存）"
-        onClick={onCapture}
-      >
-        <span className="shutter-ring" aria-hidden />
-      </button>
+      {/* ライブ: タップ or シャッターでフレームを固定 */}
+      {isLive && (
+        <>
+          <div className="freeze-hint" role="status">
+            タップでフレームを固定 → 色を採る
+          </div>
+          <button
+            type="button"
+            className="shutter-btn"
+            aria-label="撮ってフレームを固定する"
+            onClick={freeze}
+          >
+            <span className="shutter-ring" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={`wb-btn${wbGains ? " is-on" : ""}`}
+            aria-label={wbGains ? "白補正を解除" : "白い面で白補正する"}
+            onClick={onCalibrate}
+          >
+            {wbGains ? "白補正 ✓" : "白補正"}
+          </button>
+        </>
+      )}
 
-      {source === "camera" && (
-        <button
-          type="button"
-          className={`wb-btn${wbGains ? " is-on" : ""}`}
-          aria-label={wbGains ? "白補正を解除" : "白い面で白補正する"}
-          onClick={onCalibrate}
-        >
-          {wbGains ? "白補正 ✓" : "白補正"}
+      {/* カメラ固定中: 撮り直してライブへ戻る */}
+      {source === "camera" && frozen && (
+        <button type="button" className="reshoot-btn" aria-label="撮り直す" onClick={unfreeze}>
+          撮り直す
         </button>
       )}
     </main>
