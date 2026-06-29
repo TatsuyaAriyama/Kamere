@@ -91,8 +91,14 @@ const CameraView = forwardRef<ColorSourceHandle, Props>(function CameraView(
     let cancelled = false;
     async function start() {
       try {
+        // できる限り高解像度を要求（ideal なので非対応端末は自動で近い値にフォールバック）。
+        // 採色は映像の自然解像度からサンプリングするため、高画質ほど精度も上がる。
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing },
+          video: {
+            facingMode: facing,
+            width: { ideal: 3840 },
+            height: { ideal: 2160 },
+          },
           audio: false,
         });
         if (cancelled) {
