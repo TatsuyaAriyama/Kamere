@@ -3,11 +3,16 @@ import Stage from "./features/picker/Stage";
 import PaletteTray from "./features/palette/PaletteTray";
 import DesignMode from "./features/design/DesignMode";
 import DrawMode from "./features/draw/DrawMode";
+import DexMode from "./features/dex/DexMode";
 import Onboarding from "./features/onboarding/Onboarding";
 import Toast from "./features/ui/Toast";
 import { usePaletteStore } from "./store/usePaletteStore";
 import { useChameleonStore } from "./store/useChameleonStore";
 import { useOnboardingStore } from "./store/useOnboardingStore";
+import { useCollectionStore } from "./store/useCollectionStore";
+import { useToastStore } from "./store/useToastStore";
+import { hexToRgb } from "./lib/color";
+import { parseSharedHexes } from "./lib/paletteShare";
 import type { SourceErrorKind } from "./features/picker/source";
 import "./App.css";
 
@@ -19,6 +24,7 @@ export default function App() {
   const [showHint, setShowHint] = useState(true);
   const [designOpen, setDesignOpen] = useState(false);
   const [drawOpen, setDrawOpen] = useState(false);
+  const [dexOpen, setDexOpen] = useState(false);
 
   const clearPalette = usePaletteStore((s) => s.clear);
   const resetBody = useChameleonStore((s) => s.setBodyColor);
@@ -34,6 +40,26 @@ export default function App() {
     const id = window.setTimeout(() => setShowHint(false), 4200);
     return () => window.clearTimeout(id);
   }, [seenOnboarding]);
+
+  // 共有リンク（#p=…）で開かれたら、その配色を読み込む
+  useEffect(() => {
+    const hexes = parseSharedHexes();
+    if (!hexes?.length) return;
+    let added = 0;
+    let lastHex: string | null = null;
+    for (const hex of hexes) {
+      const rgb = hexToRgb(hex);
+      if (!rgb) continue;
+      const { near } = usePaletteStore.getState().add(rgb);
+      useCollectionStore.getState().discover(rgb);
+      if (!near) added += 1;
+      lastHex = hex;
+    }
+    if (lastHex) useChameleonStore.getState().setBodyColor(lastHex);
+    // 二重読み込みを防ぐためハッシュを除去
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (added > 0) useToastStore.getState().show(`共有された配色 ${added}色を読み込みました`);
+  }, []);
 
   // 永続化されたパレットがあれば、起動時に体色を最後の色へ復元
   useEffect(() => {
@@ -108,6 +134,14 @@ export default function App() {
           </button>
           <button
             type="button"
+            className="design-enter"
+            aria-label="図鑑を開く"
+            onClick={() => setDexOpen(true)}
+          >
+            図鑑
+          </button>
+          <button
+            type="button"
             className="icon-btn"
             aria-label="採った色をすべて消去"
             disabled={colorCount === 0}
@@ -133,6 +167,7 @@ export default function App() {
 
       {designOpen && <DesignMode onClose={() => setDesignOpen(false)} />}
       {drawOpen && <DrawMode onClose={() => setDrawOpen(false)} />}
+      {dexOpen && <DexMode onClose={() => setDexOpen(false)} />}
 
       {!seenOnboarding && <Onboarding onClose={completeOnboarding} />}
     </div>

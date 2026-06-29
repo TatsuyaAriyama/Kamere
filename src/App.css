@@ -1879,3 +1879,242 @@
 .ob-btn:active {
   transform: scale(0.97);
 }
+
+/* ── トップバー操作群: 横幅不足時は横スクロール（ボタンの切れを防ぐ） ── */
+.topbar-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.topbar-actions::-webkit-scrollbar {
+  display: none;
+}
+.topbar-actions > * {
+  flex-shrink: 0;
+}
+
+/* ── 共有リンク・QR シート ── */
+.share-sheet {
+  text-align: center;
+}
+
+.share-qr-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+
+.share-qr {
+  width: 220px;
+  height: 220px;
+  border-radius: var(--radius);
+  background: var(--paper);
+  display: block;
+}
+
+.share-qr-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mist);
+  font-size: 13px;
+}
+
+.share-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--mist);
+}
+
+.share-url {
+  margin: 0 auto 12px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(237, 231, 217, 0.05);
+  color: var(--mist);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.share-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.share-btn {
+  flex: 1;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--paper);
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.share-btn.primary {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--paper);
+}
+
+.share-btn:active {
+  transform: scale(0.98);
+}
+
+/* ── 図鑑 ── */
+.dex-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.dex-progress-num {
+  font-family: var(--font-display);
+  color: var(--paper);
+}
+.dex-progress-num b {
+  font-size: 30px;
+}
+.dex-progress-num span {
+  font-size: 14px;
+  color: var(--mist);
+}
+
+.dex-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(237, 231, 217, 0.1);
+  overflow: hidden;
+}
+.dex-bar-fill {
+  height: 100%;
+  background: var(--cham);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.dex-progress-pct {
+  font-size: 12px;
+  color: var(--mist);
+}
+
+.dex-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.dex-badge {
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--mist);
+  background: transparent;
+}
+.dex-badge.is-earned {
+  color: var(--ink);
+  background: var(--cham);
+  border-color: var(--cham);
+}
+
+.dex-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dex-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--paper);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 5px;
+}
+.dex-section-count {
+  font-size: 12px;
+  color: var(--mist);
+  font-family: var(--font-mono);
+}
+
+.dex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+}
+
+.dex-cell {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.dex-chip {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.dex-cell.is-locked {
+  cursor: default;
+}
+.dex-cell.is-locked .dex-chip {
+  background: rgba(237, 231, 217, 0.06);
+  color: var(--line);
+  border: 1px dashed var(--line);
+}
+
+.dex-name {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--mist);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.dex-cell.is-locked .dex-name {
+  color: var(--line);
+}
+
+.dex-reset {
+  align-self: center;
+  margin-top: 6px;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mist);
+  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
