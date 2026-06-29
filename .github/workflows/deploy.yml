@@ -39,11 +39,9 @@ jobs:
           # プロジェクトサイトのパス（https://<user>.github.io/Kamere/）
           VITE_BASE: /Kamere/
 
+      # 事前にリポジトリ設定で Pages の Source を "GitHub Actions" にしておくこと
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          # Pages 未設定でもワークフローから自動で有効化（Source = GitHub Actions）
-          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
