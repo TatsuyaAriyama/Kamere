@@ -193,6 +193,30 @@
   transform: scale(0.95);
 }
 
+.wb-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 7px 12px;
+  border: 1px solid rgba(237, 231, 217, 0.25);
+  border-radius: 999px;
+  background: rgba(22, 26, 23, 0.55);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  z-index: 3;
+}
+.wb-btn.is-on {
+  background: var(--cham);
+  color: #16210f;
+  border-color: var(--cham);
+}
+.wb-btn:active {
+  transform: scale(0.96);
+}
+
 /* ── カメレオン ─────────────────────────────── */
 .chameleon {
   position: absolute;

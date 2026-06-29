@@ -9,6 +9,8 @@ import { usePaletteStore } from "../../store/usePaletteStore";
 import { useToastStore } from "../../store/useToastStore";
 import { useCollectionStore } from "../../store/useCollectionStore";
 import { useInspoStore } from "../../store/useInspoStore";
+import { useCalibrationStore } from "../../store/useCalibrationStore";
+import { applyWhiteBalance } from "../../lib/whiteBalance";
 import { putPhoto } from "../../lib/dexPhotos";
 import { putInspoPhoto } from "../../lib/inspoPhotos";
 import { grabHaptic } from "../../lib/haptics";
@@ -57,6 +59,9 @@ export default function Stage({ source, onCameraError }: Props) {
   const addColor = usePaletteStore((s) => s.add);
   const discover = useCollectionStore((s) => s.discover);
   const showToast = useToastStore((s) => s.show);
+  const wbGains = useCalibrationStore((s) => s.gains);
+  const calibrate = useCalibrationStore((s) => s.calibrate);
+  const resetWb = useCalibrationStore((s) => s.reset);
 
   const activeHandle = useCallback(
     () => (source === "camera" ? camRef.current : photoRef.current),
@@ -105,11 +110,13 @@ export default function Stage({ source, onCameraError }: Props) {
       const client = localToClient(sampleLocal);
       const handle = activeHandle();
       // 採色確定はノイズに強いエリア平均で。未対応時は単一pxへフォールバック。
-      const rgb = handle?.sampleAreaAt(client.x, client.y) ?? handle?.sampleAt(client.x, client.y) ?? null;
-      if (!rgb) {
+      const raw = handle?.sampleAreaAt(client.x, client.y) ?? handle?.sampleAt(client.x, client.y) ?? null;
+      if (!raw) {
         showToast("ここでは色を採れません");
         return;
       }
+      // 白補正が有効なら照明の色かぶりを取り除いてから確定。
+      const rgb = applyWhiteBalance(raw, wbGains);
       const hex = rgbToHex(rgb);
       // 図鑑（カメラ採取のみ）の証拠写真を、採取した瞬間のフレームから切り出して保持。
       const thumb = source === "camera" && handle ? makeThumb(handle, client.x, client.y) : null;
@@ -120,7 +127,7 @@ export default function Stage({ source, onCameraError }: Props) {
       setAim(toLocalPt);
       setGrab({ id: ++grabIdRef.current, from, to: toLocalPt, color: hex });
     },
-    [source, activeHandle, localToClient, showToast, setFacing, setAim],
+    [source, activeHandle, localToClient, showToast, setFacing, setAim, wbGains],
   );
 
   const onTongueStart = useCallback(() => setPhase("grabbing"), [setPhase]);
@@ -163,7 +170,8 @@ export default function Stage({ source, onCameraError }: Props) {
     let added = 0;
     let found = 0;
     let lastHex: string | null = null;
-    for (const rgb of palette) {
+    for (const raw of palette) {
+      const rgb = applyWhiteBalance(raw, wbGains);
       const { near, swatch } = addColor(rgb);
       if (!near) added += 1;
       if (toDex && discover(rgb).isNew) found += 1;
@@ -176,7 +184,7 @@ export default function Stage({ source, onCameraError }: Props) {
     } else {
       showToast("すべて採取済みの配色でした");
     }
-  }, [source, activeHandle, addColor, discover, setBodyColor, showToast]);
+  }, [source, activeHandle, addColor, discover, setBodyColor, showToast, wbGains]);
 
   // ── インスピ・キャプチャ（写真＋配色を1枚のカードに保存）──
   const onCapture = useCallback(() => {
@@ -194,14 +202,36 @@ export default function Stage({ source, onCameraError }: Props) {
     const card = {
       id,
       at: Date.now(),
-      palette: palette.map((rgb) => ({ hex: rgbToHex(rgb), rgb })),
+      palette: palette.map((raw) => {
+        const rgb = applyWhiteBalance(raw, wbGains);
+        return { hex: rgbToHex(rgb), rgb };
+      }),
     };
     void putInspoPhoto(id, cap.dataUrl);
     useInspoStore.getState().add(card);
     setBodyColor(card.palette[0].hex);
     void grabHaptic();
     showToast(`インスピを保存（${palette.length}色）`);
-  }, [activeHandle, setBodyColor, showToast]);
+  }, [activeHandle, setBodyColor, showToast, wbGains]);
+
+  // ── 白補正（ホワイトバランス）：中央の白/グレー面で照明の色かぶりを合わせる ──
+  const onCalibrate = useCallback(() => {
+    if (wbGains) {
+      resetWb();
+      showToast("白補正を解除しました");
+      return;
+    }
+    const r = stageRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const ref = activeHandle()?.sampleAreaAt(r.left + r.width / 2, r.top + r.height / 2) ?? null;
+    if (!ref) {
+      showToast("白い面にかざしてからもう一度");
+      return;
+    }
+    calibrate(ref);
+    void grabHaptic();
+    showToast("白を補正しました（照明の色かぶりを補正）");
+  }, [wbGains, activeHandle, calibrate, resetWb, showToast]);
 
   // ドラッグ離し（カメレオン本体）— 採色はしない（定位置維持）
   const onPickRelease = useCallback((_local: Point) => {}, []);
@@ -221,10 +251,11 @@ export default function Stage({ source, onCameraError }: Props) {
 
   const sampleHex = useCallback(
     (client: Point): string | null => {
-      const rgb = activeHandle()?.sampleAt(client.x, client.y);
-      return rgb ? rgbToHex(rgb) : null;
+      const raw = activeHandle()?.sampleAt(client.x, client.y);
+      if (!raw) return null;
+      return rgbToHex(applyWhiteBalance(raw, wbGains));
     },
-    [activeHandle],
+    [activeHandle, wbGains],
   );
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -331,6 +362,17 @@ export default function Stage({ source, onCameraError }: Props) {
       >
         <span className="shutter-ring" aria-hidden />
       </button>
+
+      {source === "camera" && (
+        <button
+          type="button"
+          className={`wb-btn${wbGains ? " is-on" : ""}`}
+          aria-label={wbGains ? "白補正を解除" : "白い面で白補正する"}
+          onClick={onCalibrate}
+        >
+          {wbGains ? "白補正 ✓" : "白補正"}
+        </button>
+      )}
     </main>
   );
 }
