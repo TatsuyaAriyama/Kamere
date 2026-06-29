@@ -21,6 +21,44 @@ import type { ColorSourceHandle, SourceErrorKind } from "./source";
 
 const LONG_PRESS = 260; // ms
 const THUMB_SIZE = 320; // 発見アルバムの証拠写真の一辺(px)
+const STABILIZE_FRAMES = 8; // 採取確定時に平均するフレーム数（カメラのブレ・ノイズ低減）
+
+const lin = (c: number) => {
+  const x = c / 255;
+  return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+};
+const srgb = (c: number) => {
+  const v = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  return Math.max(0, Math.min(255, Math.round(v * 255)));
+};
+
+/**
+ * 同じ点を数フレームにわたりエリア採取し、リニア光で時間平均する。
+ * カメラのオート露出/WBの揺らぎやセンサーノイズを抑え、安定した代表色を返す。
+ * 静止画（写真モード）では全フレーム同一なので結果は変わらない（＝正確なまま）。
+ */
+function stabilizeSample(handle: ColorSourceHandle, x: number, y: number, frames: number): Promise<RGB | null> {
+  return new Promise((resolve) => {
+    let rl = 0,
+      gl = 0,
+      bl = 0,
+      n = 0,
+      count = 0;
+    const step = () => {
+      const s = handle.sampleAreaAt(x, y);
+      if (s) {
+        rl += lin(s.r);
+        gl += lin(s.g);
+        bl += lin(s.b);
+        n += 1;
+      }
+      count += 1;
+      if (count < frames) requestAnimationFrame(step);
+      else resolve(n ? { r: srgb(rl / n), g: srgb(gl / n), b: srgb(bl / n) } : null);
+    };
+    requestAnimationFrame(step);
+  });
+}
 
 /** 採取点まわりの正方クロップを JPEG dataURL 化（発見アルバム用）。失敗時は null。 */
 function makeThumb(handle: ColorSourceHandle, clientX: number, clientY: number): string | null {
@@ -121,11 +159,22 @@ export default function Stage({ source, onCameraError }: Props) {
       // 図鑑（カメラ採取のみ）の証拠写真を、採取した瞬間のフレームから切り出して保持。
       const thumb = source === "camera" && handle ? makeThumb(handle, client.x, client.y) : null;
       pendingRef.current = { rgb, hex, thumb };
+      const id = grabIdRef.current + 1;
+      grabIdRef.current = id;
       const from = useChameleonStore.getState().pos;
       // 標的の方へ向き直り、目線を固定（照準）
       setFacing(toLocalPt.x >= from.x ? 1 : -1);
       setAim(toLocalPt);
-      setGrab({ id: ++grabIdRef.current, from, to: toLocalPt, color: hex });
+      setGrab({ id, from, to: toLocalPt, color: hex });
+      // 採取確定までの間に複数フレームを平均してブレを抑える（確定値を上書き）。
+      if (handle) {
+        void stabilizeSample(handle, client.x, client.y, STABILIZE_FRAMES).then((avg) => {
+          if (!avg || grabIdRef.current !== id || !pendingRef.current) return;
+          const stable = applyWhiteBalance(avg, wbGains);
+          pendingRef.current.rgb = stable;
+          pendingRef.current.hex = rgbToHex(stable);
+        });
+      }
     },
     [source, activeHandle, localToClient, showToast, setFacing, setAim, wbGains],
   );
